@@ -8,17 +8,42 @@ require("dotenv").config();
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-const frontendOrigin = process.env.FRONTEND_URL;
+const PRODUCTION_FRONTEND_URL = "https://lambent-faun-f0f886.netlify.app";
+const LOCAL_FRONTEND_URLS = ["http://localhost:5173", "http://127.0.0.1:5173"];
+
+const normalizeOrigin = (origin = "") => origin.trim().replace(/\/+$/, "");
+
+const configuredFrontendUrls = (process.env.FRONTEND_URL || "")
+  .split(",")
+  .map(normalizeOrigin)
+  .filter(Boolean);
+
+const allowedOrigins = new Set(
+  [PRODUCTION_FRONTEND_URL, ...LOCAL_FRONTEND_URLS, ...configuredFrontendUrls]
+    .map(normalizeOrigin)
+    .filter(Boolean)
+);
 
 app.use(
-  cors(
-    frontendOrigin
-      ? {
-          origin: frontendOrigin.split(",").map((origin) => origin.trim()),
-        }
-      : undefined
-  )
+  cors({
+    origin(origin, callback) {
+      // Allow non-browser requests such as curl, Render health checks, and local API tests.
+      if (!origin) {
+        return callback(null, true);
+      }
+
+      const normalizedOrigin = normalizeOrigin(origin);
+
+      if (allowedOrigins.has(normalizedOrigin)) {
+        return callback(null, true);
+      }
+
+      return callback(new Error(`CORS bloqueado para el origen: ${origin}`));
+    },
+  })
 );
+
+app.use(express.json());
 
 const moviesPath = path.resolve(__dirname, "peliculas.json");
 
@@ -34,6 +59,14 @@ const loadMovies = () => {
 };
 
 let movies = loadMovies();
+
+app.get("/", (_req, res) => {
+  res.json({
+    ok: true,
+    message: "API del Buscador de Películas",
+    endpoints: ["/api/health", "/api/movies", "/api/movies/:id"],
+  });
+});
 
 app.get("/api/health", (_req, res) => {
   res.json({ ok: true, totalPeliculas: movies.length });
@@ -96,10 +129,10 @@ app.post("/api/reload", (_req, res) => {
 });
 
 app.use((error, _req, res, _next) => {
-  console.error(error);
+  console.error(error.message || error);
   res.status(500).json({ message: "Error interno del servidor" });
 });
 
 app.listen(PORT, () => {
-  console.log(`API escuchando en http://localhost:${PORT}`);
+  console.log(`API escuchando en el puerto ${PORT}`);
 });
