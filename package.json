@@ -1,7 +1,7 @@
 {
-  "name": "peliculas-backend",
+  "name": "productos-backend",
   "version": "1.0.0",
-  "description": "API para buscar películas desde un archivo JSON",
+  "description": "API para catálogo de productos",
   "main": "server.js",
   "type": "commonjs",
   "scripts": {
